@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>策略查询 - 定价平台</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
+  font-size: 14px; color: #333; background: #f0f2f5; min-height: 100vh;
+  display: flex; flex-direction: column;
+}
+/* ── Top Header ───────────────────────────────── */
+.top-header {
+  height: 52px; background: #1a2848;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px; flex-shrink: 0; z-index: 100;
+}
+.header-logo { display: flex; align-items: center; gap: 10px; color: #fff; font-size: 17px; font-weight: 700; letter-spacing: 0.5px; }
+.logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg,#1677ff,#4096ff); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.header-nav { display: flex; align-items: center; gap: 24px; color: rgba(255,255,255,0.75); font-size: 13px; }
+.header-nav span { cursor: pointer; transition: color .2s; }
+.header-nav span:hover { color: #fff; }
+.header-divider { width: 1px; height: 14px; background: rgba(255,255,255,0.2); }
+.header-lang { display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.75); cursor: pointer; font-size: 13px; }
+.header-user { display: flex; align-items: center; gap: 6px; color: rgba(255,255,255,0.75); cursor: pointer; font-size: 13px; padding: 4px 8px; border-radius: 4px; transition: background .2s; }
+.header-user:hover { background: rgba(255,255,255,0.1); }
+.user-avatar { width: 24px; height: 24px; border-radius: 50%; background: #1677ff; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #fff; }
+/* ── Layout ───────────────────────────────────── */
+.layout { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+/* ── Sidebar ──────────────────────────────────── */
+.sidebar { width: 200px; flex-shrink: 0; background: #1a2848; display: flex; flex-direction: column; overflow-y: auto; transition: width .25s; }
+.sidebar.collapsed { width: 52px; }
+.sidebar::-webkit-scrollbar { width: 0; }
+.nav-group { padding: 8px 0; }
+.nav-item { display: flex; align-items: center; padding: 0 16px; height: 44px; cursor: pointer; color: rgba(255,255,255,0.65); font-size: 14px; gap: 10px; transition: all .2s; white-space: nowrap; user-select: none; border-left: 3px solid transparent; }
+.nav-item:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.9); }
+.nav-item.active { background: rgba(22,119,255,0.18); color: #4096ff; border-left-color: #1677ff; }
+.nav-item.sub { padding-left: 44px; height: 38px; font-size: 13px; }
+.nav-icon { font-size: 16px; flex-shrink: 0; width: 20px; text-align: center; }
+.nav-label { flex: 1; }
+.nav-arrow { font-size: 11px; transition: transform .2s; color: rgba(255,255,255,0.35); }
+.nav-arrow.open { transform: rotate(90deg); }
+.nav-sub { overflow: hidden; max-height: 0; transition: max-height .3s ease; }
+.nav-sub.open { max-height: 300px; }
+.sidebar-collapse { display: flex; align-items: center; justify-content: center; height: 40px; cursor: pointer; color: rgba(255,255,255,0.35); font-size: 16px; transition: color .2s; border-top: 1px solid rgba(255,255,255,0.07); margin-top: auto; }
+.sidebar-collapse:hover { color: rgba(255,255,255,0.65); }
+/* ── Main Content ─────────────────────────────── */
+.main-content { flex: 1; display: flex; flex-direction: column; overflow: auto; min-width: 0; }
+/* ── Breadcrumb ───────────────────────────────── */
+.breadcrumb { padding: 14px 24px 0; font-size: 13px; color: #999; display: flex; align-items: center; gap: 6px; }
+.breadcrumb .current { color: #333; font-weight: 500; }
+.breadcrumb .sep { color: #ccc; }
+/* ── Filter Card ──────────────────────────────── */
+.filter-card { margin: 12px 24px 0; background: #fff; border-radius: 8px; padding: 20px 24px 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+.filter-title { font-size: 15px; font-weight: 600; color: #1a2848; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f0f2f5; display: flex; align-items: center; gap: 8px; }
+.filter-title::before { content: ''; width: 3px; height: 16px; background: #1677ff; border-radius: 2px; display: inline-block; }
+.filter-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px 20px; margin-bottom: 16px; }
+@media (min-width:1400px) { .filter-grid { grid-template-columns: repeat(5,1fr); } }
+.filter-item-date { grid-column: span 2; }
+.filter-item { display: flex; flex-direction: column; gap: 6px; }
+.filter-label { font-size: 13px; color: #666; }
+.filter-input, .filter-select {
+  height: 36px; border: 1px solid #d9d9d9; border-radius: 6px;
+  padding: 0 11px; font-size: 14px; color: #333; background: #fff;
+  outline: none; transition: border-color .2s, box-shadow .2s; width: 100%; -webkit-appearance: none;
+}
+.filter-input:focus, .filter-select:focus { border-color: #1677ff; box-shadow: 0 0 0 2px rgba(22,119,255,0.1); }
+.filter-input::placeholder { color: #bfbfbf; }
+.filter-select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23bfbfbf' d='M5 6L0 0h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px; cursor: pointer; }
+.date-range-wrap { display: flex; align-items: center; gap: 8px; }
+.date-range-wrap input[type="date"] { flex: 1; min-width: 0; height: 36px; border: 1px solid #d9d9d9; border-radius: 6px; padding: 0 8px; font-size: 13px; color: #333; background: #fff; outline: none; cursor: pointer; transition: border-color .2s, box-shadow .2s; }
+.date-range-wrap input[type="date"]:focus { border-color: #1677ff; box-shadow: 0 0 0 2px rgba(22,119,255,0.1); }
+.date-sep { color: #999; font-size: 13px; flex-shrink: 0; }
+.filter-actions { display: flex; justify-content: flex-end; align-items: center; gap: 12px; padding: 8px 0 16px; border-top: 1px solid #f5f5f5; margin-top: 8px; }
+.btn { height: 36px; padding: 0 20px; border-radius: 6px; font-size: 14px; cursor: pointer; border: 1px solid transparent; display: flex; align-items: center; gap: 6px; transition: all .2s; font-family: inherit; }
+.btn-primary { background: #1677ff; color: #fff; border-color: #1677ff; }
+.btn-primary:hover { background: #4096ff; border-color: #4096ff; }
+.btn-default { background: #fff; color: #666; border-color: #d9d9d9; }
+.btn-default:hover { color: #1677ff; border-color: #1677ff; }
+/* ── Result Panel ─────────────────────────────── */
+.result-panel { margin: 16px 24px 0; background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); overflow: hidden; }
+.result-panel:last-child { margin-bottom: 24px; }
+.result-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid #f0f2f5; }
+.result-title-wrap { display: flex; align-items: center; gap: 10px; }
+.result-title { font-size: 14px; font-weight: 600; color: #1a2848; }
+.result-count { font-size: 12px; color: #999; background: #f5f5f5; padding: 2px 10px; border-radius: 10px; }
+.result-meta { font-size: 12px; color: #bbb; }
+/* ── Hit Indicator ────────────────────────────── */
+.hit-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #555; }
+.hit-badge { display: inline-flex; align-items: center; padding: 1px 10px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+.hit-yes { background: #f6ffed; color: #52c41a; border: 1px solid #b7eb8f; }
+.hit-no  { background: #fff2f0; color: #ff4d4f; border: 1px solid #ffccc7; }
+/* ── Status Badges ────────────────────────────── */
+.status-badge { display: inline-flex; align-items: center; padding: 1px 9px; border-radius: 10px; font-size: 12px; font-weight: 500; }
+.status-valid   { background: #f6ffed; color: #52c41a; border: 1px solid #b7eb8f; }
+.status-invalid { background: #f5f5f5; color: #999;    border: 1px solid #e0e0e0; }
+.status-pending { background: #fff7e6; color: #fa8c16; border: 1px solid #ffd591; }
+/* ── Table ────────────────────────────────────── */
+.table-wrap { overflow-x: auto; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 900px; }
+.data-table th { background: #fafafa; color: #555; font-weight: 600; padding: 10px 12px; text-align: center; border-bottom: 1px solid #e8e8e8; white-space: nowrap; position: sticky; top: 0; z-index: 5; }
+.data-table td { padding: 10px 12px; text-align: center; border-bottom: 1px solid #f5f5f5; color: #333; vertical-align: middle; }
+.data-table tbody tr:hover { background: #f5f8ff; }
+.data-table tbody tr:last-child td { border-bottom: none; }
+/* ── Sticky first col ─────────────────────────── */
+.data-table th:first-child, .data-table td:first-child { position: sticky; left: 0; background: #fafafa; z-index: 4; border-right: 1px solid #e8e8e8; }
+.data-table tbody tr:hover td:first-child { background: #f5f8ff; }
+/* ── Strategy ID — subtle clickable ──────────── */
+.sid-link { color: #595959; cursor: pointer; font-size: 13px; transition: color .15s; border-bottom: 1px dashed transparent; line-height: 1.4; }
+.sid-link:hover { color: #1677ff; border-bottom-color: #91caff; }
+/* ── Action link ──────────────────────────────── */
+.act-link { color: #1677ff; cursor: pointer; font-size: 13px; text-decoration: none; transition: color .15s; }
+.act-link:hover { color: #4096ff; text-decoration: underline; }
+/* ── Neg margin indicator ─────────────────────── */
+.neg-yes { color: #f5222d; font-weight: 600; }
+.neg-no  { color: #999; }
+/* ── Price tool tag ───────────────────────────── */
+.tool-tag { display: inline-flex; padding: 1px 8px; background: rgba(22,119,255,0.07); color: #1677ff; border-radius: 4px; font-size: 12px; border: 1px solid rgba(22,119,255,0.15); }
+/* ── Empty / Loading ──────────────────────────── */
+.empty-state { padding: 50px 20px; text-align: center; color: #bbb; }
+.empty-icon { font-size: 36px; margin-bottom: 10px; }
+.empty-text { font-size: 14px; }
+.loading-row td { padding: 36px !important; text-align: center; color: #999; }
+/* ── Modal ────────────────────────────────────── */
+.modal-mask { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1000; animation: fadeIn .2s; }
+.modal-mask.show { display: flex; align-items: center; justify-content: center; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.modal { background: #fff; border-radius: 8px; width: 580px; max-width: calc(100vw - 40px); box-shadow: 0 8px 32px rgba(0,0,0,0.2); animation: slideUp .2s; overflow: hidden; }
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #f0f2f5; background: #fafcff; }
+.modal-title { font-size: 15px; font-weight: 600; color: #1a2848; display: flex; align-items: center; gap: 8px; }
+.modal-close { width: 28px; height: 28px; border-radius: 6px; border: 1px solid #e8e8e8; background: #fff; cursor: pointer; font-size: 14px; color: #999; display: flex; align-items: center; justify-content: center; transition: all .2s; }
+.modal-close:hover { background: #fff2f0; color: #f5222d; border-color: #ffccc7; }
+.modal-body { padding: 20px; }
+.modal-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.info-item { display: flex; flex-direction: column; gap: 4px; padding: 12px; background: #fafafa; border-radius: 6px; border: 1px solid #f0f0f0; }
+.info-label { font-size: 12px; color: #999; }
+.info-value { font-size: 14px; font-weight: 500; color: #333; }
+.info-value.active { color: #52c41a; }
+.modal-desc { margin-top: 14px; padding: 12px; background: rgba(22,119,255,0.04); border: 1px solid rgba(22,119,255,0.12); border-radius: 6px; font-size: 13px; color: #555; line-height: 1.7; }
+.modal-footer { padding: 12px 20px 16px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #f5f5f5; }
+.badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 10px; font-size: 12px; font-weight: 500; }
+.badge-blue  { background: rgba(22,119,255,0.1); color: #1677ff; border: 1px solid rgba(22,119,255,0.2); }
+.badge-green { background: #f6ffed; color: #52c41a; border: 1px solid #b7eb8f; }
+</style>
+</head>
+<body>
+
+<!-- Top Header -->
+<header class="top-header">
+  <div class="header-logo">
+    <div class="logo-icon">💲</div>
+    定价平台
+  </div>
+  <div class="header-nav">
+    <span>返回首页</span>
+    <div class="header-divider"></div>
+    <span>快速切换</span>
+    <div class="header-divider"></div>
+    <span>公告中心</span>
+    <div class="header-divider"></div>
+    <div class="header-lang">🇨🇳 中 ▾</div>
+    <div class="header-divider"></div>
+    <div class="header-user">
+      <div class="user-avatar">T</div>
+      TR055109 ▾
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="nav-group">
+      <div class="nav-item" onclick="toggleNav(this)">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">系统调价</span>
+        <span class="nav-arrow">›</span>
+      </div>
+      <div class="nav-sub">
+        <div class="nav-item sub">超级促销</div>
+        <div class="nav-item sub">价格日历</div>
+      </div>
+      <div class="nav-item" onclick="toggleNav(this)">
+        <span class="nav-icon">👤</span>
+        <span class="nav-label">人工调价</span>
+        <span class="nav-arrow">›</span>
+      </div>
+      <div class="nav-sub">
+        <div class="nav-item sub">普通促销</div>
+        <div class="nav-item sub">超级促销</div>
+        <div class="nav-item sub">优惠券调价</div>
+        <div class="nav-item sub">模板管理</div>
+      </div>
+      <div class="nav-item" onclick="toggleNav(this)">
+        <span class="nav-icon">🔍</span>
+        <span class="nav-label">信息查询</span>
+        <span class="nav-arrow">›</span>
+      </div>
+      <div class="nav-sub open">
+        <div class="nav-item sub" onclick="location.href='price-query.html'">价格查询</div>
+        <div class="nav-item sub active">策略查询</div>
+      </div>
+      <div class="nav-item" onclick="toggleNav(this)">
+        <span class="nav-icon">🤖</span>
+        <span class="nav-label">智能化</span>
+        <span class="nav-arrow">›</span>
+      </div>
+      <div class="nav-sub">
+        <div class="nav-item sub">智能定价</div>
+        <div class="nav-item sub">价格预测</div>
+      </div>
+    </div>
+    <div class="sidebar-collapse" onclick="toggleSidebar()" title="折叠侧栏">‹</div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main-content">
+
+    <!-- 面包屑 -->
+    <div class="breadcrumb">
+      <span>信息查询</span>
+      <span class="sep">›</span>
+      <span class="current">策略查询</span>
+    </div>
+
+    <!-- 筛选区 -->
+    <div class="filter-card">
+      <div class="filter-title">查询条件</div>
+      <div class="filter-grid">
+
+        <!-- 数据维度 -->
+        <div class="filter-item">
+          <label class="filter-label">数据维度</label>
+          <select class="filter-select" id="f-dimension" onchange="updateDataInfoPlaceholder()">
+            <option value="resId" selected>资源 ID</option>
+            <option value="ticketId">二级票种 ID</option>
+            <option value="poiId">POI ID</option>
+          </select>
+        </div>
+
+        <!-- 数据信息 -->
+        <div class="filter-item">
+          <label class="filter-label">数据信息</label>
+          <input class="filter-input" id="f-dataInfo" type="text" placeholder="请输入资源 ID" />
+        </div>
+
+        <!-- locale -->
+        <div class="filter-item">
+          <label class="filter-label">locale</label>
+          <select class="filter-select" id="f-locale">
+            <option value="" selected>不限</option>
+            <option value="zh-CN">zh-CN</option>
+            <option value="zh-HK">zh-HK</option>
+            <option value="en-US">en-US</option>
+            <option value="ja-JP">ja-JP</option>
+            <option value="ko-KR">ko-KR</option>
+          </select>
+        </div>
+
+        <!-- 策略状态 -->
+        <div class="filter-item">
+          <label class="filter-label">策略状态</label>
+          <select class="filter-select" id="f-status">
+            <option value="" selected>不限</option>
+            <option value="valid">有效</option>
+            <option value="invalid">无效</option>
+          </select>
+        </div>
+
+        <!-- 模块 -->
+        <div class="filter-item">
+          <label class="filter-label">模块</label>
+          <select class="filter-select" id="f-module">
+            <option value="" selected>不限</option>
+            <option value="sys">系统调价</option>
+            <option value="man">人工调价</option>
+          </select>
+        </div>
+
+        <!-- 策略有效期 -->
+        <div class="filter-item filter-item-date">
+          <label class="filter-label">策略有效期</label>
+          <div class="date-range-wrap">
+            <input type="date" id="f-periodStart" placeholder="不限" />
+            <span class="date-sep">至</span>
+            <input type="date" id="f-periodEnd" placeholder="不限" />
+          </div>
+        </div>
+
+        <!-- 班期范围 -->
+        <div class="filter-item filter-item-date">
+          <label class="filter-label">班期范围</label>
+          <div class="date-range-wrap">
+            <input type="date" id="f-dateStart" placeholder="不限" />
+            <span class="date-sep">至</span>
+            <input type="date" id="f-dateEnd" placeholder="不限" />
+          </div>
+        </div>
+
+      </div>
+      <div class="filter-actions">
+        <button class="btn btn-default" onclick="resetFilters()">↺ 重置</button>
+        <button class="btn btn-primary" onclick="doQuery()">🔍 查询</button>
+      </div>
+    </div>
+
+    <!-- 结果区：初始空状态 -->
+    <div id="emptyState" class="result-panel" style="margin-bottom:24px">
+      <div class="result-header">
+        <div class="result-title-wrap">
+          <div class="result-title">查询结果</div>
+        </div>
+      </div>
+      <div class="empty-state">
+        <div class="empty-icon">📋</div>
+        <div class="empty-text">请输入查询条件后点击"查询"按钮</div>
+      </div>
+    </div>
+
+    <!-- 结果区：黑名单命中（查询后显示） -->
+    <div id="blacklistPanel" class="result-panel" style="display:none">
+      <div class="result-header">
+        <div class="result-title-wrap">
+          <div class="result-title">黑名单命中情况</div>
+          <div class="hit-row">
+            是否命中黑名单：
+            <span id="blacklistHitBadge" class="hit-badge hit-yes">是</span>
+          </div>
+          <span class="result-count" id="blacklistCount">共 0 条</span>
+        </div>
+        <div class="result-meta" id="blacklistQueryTime"></div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table" style="min-width:1050px">
+          <thead>
+            <tr>
+              <th style="min-width:90px">模块</th>
+              <th style="min-width:100px">分类</th>
+              <th style="min-width:90px">策略 ID</th>
+              <th style="min-width:160px">策略名称</th>
+              <th style="min-width:80px">策略状态</th>
+              <th style="min-width:170px">策略有效期</th>
+              <th style="min-width:170px">班期范围</th>
+              <th style="min-width:80px">locale</th>
+              <th style="min-width:90px">创建人</th>
+              <th style="min-width:80px">操作</th>
+            </tr>
+          </thead>
+          <tbody id="blacklistBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 结果区：调价策略命中（查询后显示） -->
+    <div id="strategyPanel" class="result-panel" style="display:none;margin-bottom:24px">
+      <div class="result-header">
+        <div class="result-title-wrap">
+          <div class="result-title">调价策略命中情况</div>
+          <div class="hit-row">
+            是否命中调价策略：
+            <span id="strategyHitBadge" class="hit-badge hit-yes">是</span>
+          </div>
+          <span class="result-count" id="strategyCount">共 0 条</span>
+        </div>
+        <div class="result-meta" id="strategyQueryTime"></div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table" style="min-width:1500px">
+          <thead>
+            <tr>
+              <th style="min-width:90px">模块</th>
+              <th style="min-width:100px">分类</th>
+              <th style="min-width:80px">业务线</th>
+              <th style="min-width:90px">策略 ID</th>
+              <th style="min-width:160px">策略名称</th>
+              <th style="min-width:80px">策略状态</th>
+              <th style="min-width:170px">策略有效期</th>
+              <th style="min-width:170px">班期范围</th>
+              <th style="min-width:80px">locale</th>
+              <th style="min-width:90px">调价工具</th>
+              <th style="min-width:80px">调价金额</th>
+              <th style="min-width:120px">用户 IP</th>
+              <th style="min-width:80px">是否负毛利</th>
+              <th style="min-width:90px">创建人</th>
+            </tr>
+          </thead>
+          <tbody id="strategyBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Modal: 策略详情 -->
+<div class="modal-mask" id="detailModal" onclick="closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">📑 策略详情</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-info-grid" id="modalInfoGrid"></div>
+      <div class="modal-desc" id="modalDesc"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-default" onclick="closeModal()">关 闭</button>
+      <button class="btn btn-primary" onclick="viewFullStrategy()">查看完整策略 →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── Sidebar ─────────────────────────────────── */
+function toggleNav(el) {
+  const sub = el.nextElementSibling;
+  const arrow = el.querySelector('.nav-arrow');
+  if (sub && sub.classList.contains('nav-sub')) {
+    sub.classList.toggle('open');
+    if (arrow) arrow.classList.toggle('open');
+  }
+}
+let sidebarCollapsed = false;
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  sidebarCollapsed = !sidebarCollapsed;
+  sb.classList.toggle('collapsed', sidebarCollapsed);
+  sb.querySelector('.sidebar-collapse').textContent = sidebarCollapsed ? '›' : '‹';
+}
+
+/* ── 数据维度联动 placeholder ─────────────────── */
+const placeholderMap = { resId:'请输入资源 ID', ticketId:'请输入二级票种 ID', poiId:'请输入 POI ID' };
+function updateDataInfoPlaceholder() {
+  const dim = document.getElementById('f-dimension').value;
+  document.getElementById('f-dataInfo').placeholder = placeholderMap[dim] || '请输入';
+}
+
+/* ── 重置 ─────────────────────────────────────── */
+function resetFilters() {
+  document.getElementById('f-dimension').value = 'resId';
+  document.getElementById('f-dataInfo').value  = '';
+  document.getElementById('f-locale').value    = '';
+  document.getElementById('f-status').value    = '';
+  document.getElementById('f-module').value    = '';
+  document.getElementById('f-periodStart').value = '';
+  document.getElementById('f-periodEnd').value   = '';
+  document.getElementById('f-dateStart').value   = '';
+  document.getElementById('f-dateEnd').value     = '';
+  updateDataInfoPlaceholder();
+  document.getElementById('emptyState').style.display  = '';
+  document.getElementById('blacklistPanel').style.display = 'none';
+  document.getElementById('strategyPanel').style.display  = 'none';
+}
+
+/* ── Mock 数据 ────────────────────────────────── */
+const blacklistMock = [
+  { module:'系统调价', cat:'gj黑名单',    sid:55001001, sname:'GJ黑名单-五一特惠',    status:'有效', period:'2026/4/1 - 2026/5/31',   dateRange:'2026/4/25 - 2026/5/5',  locale:'zh-CN', creator:'TR055109' },
+  { module:'人工调价', cat:'直接调价',    sid:55002001, sname:'人工直调-资源黑名单',  status:'有效', period:'2026/4/15 - 2026/5/15',  dateRange:'2026/4/28 - 2026/4/30', locale:'zh-CN', creator:'TR055110' },
+  { module:'人工调价', cat:'优惠券调价',  sid:55002002, sname:'券黑名单-劳动节',      status:'审批中', period:'2026/4/25 - 2026/5/3', dateRange:'2026/5/1 - 2026/5/3',   locale:'zh-HK', creator:'TR055111' },
+];
+
+const strategyMock = [
+  { module:'系统调价', cat:'Metagj',    biz:'门票', sid:44001001, sname:'Metagj-劳动节联动',     status:'有效', period:'2026/4/20 - 2026/5/10', dateRange:'2026/4/28 - 2026/5/5',  locale:'zh-CN', tool:'超级促销', amount:'−5元',  ip:'不限',       negMargin:'否', creator:'TR055109' },
+  { module:'系统调价', cat:'相对gj',    biz:'门票', sid:43125360, sname:'系统日历-端午备货',     status:'有效', period:'2026/4/25 - 2026/5/15', dateRange:'2026/4/28 - 2026/5/1',  locale:'zh-CN', tool:'价格日历', amount:'−12元', ip:'不限',       negMargin:'否', creator:'TR055112' },
+  { module:'人工调价', cat:'直接调价',  biz:'门票', sid:42125324, sname:'人工普促-资源A',        status:'有效', period:'2026/4/28 - 2026/5/10', dateRange:'2026/4/28 - 2026/5/3',  locale:'zh-CN', tool:'普通促销', amount:'−3元',  ip:'不限',       negMargin:'否', creator:'TR055110' },
+  { module:'人工调价', cat:'直接调价',  biz:'玩乐', sid:42125328, sname:'人工超促-特定资源',     status:'有效', period:'2026/4/20 - 2026/5/3',  dateRange:'2026/5/1 - 2026/5/3',   locale:'zh-CN', tool:'超级促销', amount:'−7元',  ip:'不限',       negMargin:'是', creator:'TR055113' },
+  { module:'人工调价', cat:'优惠券调价',biz:'门票', sid:42125326, sname:'优惠券调价-五一',       status:'有效', period:'2026/4/28 - 2026/5/3',  dateRange:'2026/4/28 - 2026/5/3',  locale:'zh-CN', tool:'价格日历', amount:'−2元',  ip:'100.0.0.1',  negMargin:'否', creator:'TR055110' },
+];
+
+/* ── 策略详情 mock ──────────────────────────── */
+const detailMock = {
+  55001001: { name:'GJ黑名单-五一特惠',    type:'系统-gj黑名单',  status:'有效', module:'系统调价', cat:'gj黑名单',   period:'2026/4/1 - 2026/5/31',   locale:'zh-CN', creator:'TR055109', desc:'针对劳动节期间 gj 渠道黑名单配置，限制特定资源在该渠道的调价生效。' },
+  55002001: { name:'人工直调-资源黑名单',  type:'人工-直接调价',  status:'有效', module:'人工调价', cat:'直接调价',   period:'2026/4/15 - 2026/5/15',  locale:'zh-CN', creator:'TR055110', desc:'运营手动配置的资源黑名单，该资源在有效期内不参与直接调价策略。' },
+  55002002: { name:'券黑名单-劳动节',      type:'人工-优惠券调价',status:'审批中',module:'人工调价', cat:'优惠券调价', period:'2026/4/25 - 2026/5/3',   locale:'zh-HK', creator:'TR055111', desc:'劳动节优惠券调价黑名单配置，当前处于审批流程中，审批通过后生效。' },
+  44001001: { name:'Metagj-劳动节联动',   type:'系统-Metagj',    status:'有效', module:'系统调价', cat:'Metagj',     period:'2026/4/20 - 2026/5/10',  locale:'zh-CN', creator:'TR055109', desc:'Metagj 渠道劳动节联动调价，提升元搜索流量位竞争力，超级促销工具减价 5 元。' },
+  43125360: { name:'系统日历-端午备货',   type:'系统-价格日历',  status:'有效', module:'系统调价', cat:'相对gj',     period:'2026/4/25 - 2026/5/15',  locale:'zh-CN', creator:'TR055112', desc:'端午节前备货阶段系统价格日历调价，覆盖节前及节中班期。' },
+  42125324: { name:'人工普促-资源A',      type:'人工-普通促销',  status:'有效', module:'人工调价', cat:'直接调价',   period:'2026/4/28 - 2026/5/10',  locale:'zh-CN', creator:'TR055110', desc:'运营手动配置普通促销，小幅降价提升资源 A 的点击率和转化。' },
+  42125328: { name:'人工超促-特定资源',   type:'人工-超级促销',  status:'有效', module:'人工调价', cat:'直接调价',   period:'2026/4/20 - 2026/5/3',   locale:'zh-CN', creator:'TR055113', desc:'针对特定资源人工超级促销，力度较大，存在负毛利风险，需关注。' },
+  42125326: { name:'优惠券调价-五一',     type:'人工-优惠券调价',status:'有效', module:'人工调价', cat:'优惠券调价', period:'2026/4/28 - 2026/5/3',   locale:'zh-CN', creator:'TR055110', desc:'五一期间优惠券调价策略，与价格日历绑定，用户 IP 100.0.0.1 专属。' },
+};
+
+/* ── 状态徽标 ─────────────────────────────────── */
+function statusBadge(s) {
+  const cls = s === '有效' ? 'status-valid' : s === '无效' ? 'status-invalid' : 'status-pending';
+  return `<span class="status-badge ${cls}">${s}</span>`;
+}
+
+/* ── 主查询 ───────────────────────────────────── */
+function doQuery() {
+  const dataInfo = document.getElementById('f-dataInfo').value.trim();
+  if (!dataInfo) { alert('请输入数据信息'); return; }
+
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('blacklistPanel').style.display = '';
+  document.getElementById('strategyPanel').style.display  = '';
+
+  // 黑名单 loading
+  document.getElementById('blacklistBody').innerHTML =
+    `<tr class="loading-row"><td colspan="10">⏳ 查询中，请稍候...</td></tr>`;
+  // 调价策略 loading
+  document.getElementById('strategyBody').innerHTML =
+    `<tr class="loading-row"><td colspan="14">⏳ 查询中，请稍候...</td></tr>`;
+
+  setTimeout(() => {
+    const now = new Date();
+    const timeStr = `查询时间：${now.toLocaleTimeString('zh-CN')}`;
+
+    // —— 渲染黑名单 ——
+    const blRows = blacklistMock;
+    if (blRows.length > 0) {
+      document.getElementById('blacklistHitBadge').className = 'hit-badge hit-yes';
+      document.getElementById('blacklistHitBadge').textContent = '是';
+      document.getElementById('blacklistBody').innerHTML = blRows.map(r => `
+        <tr>
+          <td style="font-weight:500;color:#1a2848">${r.module}</td>
+          <td>${r.cat}</td>
+          <td><span class="sid-link" onclick="showDetail(${r.sid})" title="点击查看策略详情">${r.sid}</span></td>
+          <td style="text-align:left">${r.sname}</td>
+          <td>${statusBadge(r.status)}</td>
+          <td style="color:#666;font-size:12px">${r.period}</td>
+          <td style="color:#666;font-size:12px">${r.dateRange}</td>
+          <td>${r.locale}</td>
+          <td style="color:#595959">${r.creator}</td>
+          <td><a class="act-link" onclick="showDetail(${r.sid})">查看详情</a></td>
+        </tr>`).join('');
+    } else {
+      document.getElementById('blacklistHitBadge').className = 'hit-badge hit-no';
+      document.getElementById('blacklistHitBadge').textContent = '否';
+      document.getElementById('blacklistBody').innerHTML =
+        `<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">🛡️</div><div class="empty-text">未命中任何黑名单配置</div></div></td></tr>`;
+    }
+    document.getElementById('blacklistCount').textContent = `共 ${blRows.length} 条`;
+    document.getElementById('blacklistQueryTime').textContent = timeStr;
+
+    // —— 渲染调价策略 ——
+    const stRows = strategyMock;
+    if (stRows.length > 0) {
+      document.getElementById('strategyHitBadge').className = 'hit-badge hit-yes';
+      document.getElementById('strategyHitBadge').textContent = '是';
+      document.getElementById('strategyBody').innerHTML = stRows.map(r => `
+        <tr>
+          <td style="font-weight:500;color:#1a2848">${r.module}</td>
+          <td>${r.cat}</td>
+          <td>${r.biz}</td>
+          <td><span class="sid-link" onclick="showDetail(${r.sid})" title="点击查看策略详情">${r.sid}</span></td>
+          <td style="text-align:left">${r.sname}</td>
+          <td>${statusBadge(r.status)}</td>
+          <td style="color:#666;font-size:12px">${r.period}</td>
+          <td style="color:#666;font-size:12px">${r.dateRange}</td>
+          <td>${r.locale}</td>
+          <td><span class="tool-tag">${r.tool}</span></td>
+          <td style="font-weight:700;color:#1a2848">${r.amount}</td>
+          <td style="color:#595959;font-size:12px">${r.ip}</td>
+          <td class="${r.negMargin === '是' ? 'neg-yes' : 'neg-no'}">${r.negMargin}</td>
+          <td style="color:#595959">${r.creator}</td>
+        </tr>`).join('');
+    } else {
+      document.getElementById('strategyHitBadge').className = 'hit-badge hit-no';
+      document.getElementById('strategyHitBadge').textContent = '否';
+      document.getElementById('strategyBody').innerHTML =
+        `<tr><td colspan="14"><div class="empty-state"><div class="empty-icon">📊</div><div class="empty-text">未命中任何调价策略</div></div></td></tr>`;
+    }
+    document.getElementById('strategyCount').textContent = `共 ${stRows.length} 条`;
+    document.getElementById('strategyQueryTime').textContent = timeStr;
+  }, 600);
+}
+
+/* ── 策略详情弹窗 ────────────────────────────── */
+let currentSid = null;
+function showDetail(sid) {
+  currentSid = sid;
+  const d = detailMock[sid] || { name:'策略详情', type:'—', status:'—', module:'—', cat:'—', period:'—', locale:'—', creator:'—', desc:'暂无详细信息。' };
+  document.getElementById('modalInfoGrid').innerHTML = `
+    <div class="info-item">
+      <div class="info-label">策略 ID</div>
+      <div class="info-value" style="color:#1677ff;font-size:15px">${sid}</div>
+    </div>
+    <div class="info-item">
+      <div class="info-label">策略名称</div>
+      <div class="info-value">${d.name}</div>
+    </div>
+    <div class="info-item">
+      <div class="info-label">策略类型</div>
+      <div class="info-value"><span class="badge badge-blue">${d.type}</span></div>
+    </div>
+    <div class="info-item">
+      <div class="info-label">当前状态</div>
+      <div class="info-value active">${d.status}</div>
+    </div>
+    <div class="info-item">
+      <div class="info-label">所属模块</div>
+      <div class="info-value">${d.module} / ${d.cat}</div>
+    </div>
+    <div class="info-item">
+      <div class="info-label">创建人（工号）</div>
+      <div class="info-value">${d.creator}</div>
+    </div>
+    <div class="info-item">
+      <div class="info-label">策略有效期</div>
+      <div class="info-value" style="font-size:12px">${d.period}</div>
+    </div>
+    <div class="info-item">
+      <div class="info-label">locale</div>
+      <div class="info-value">${d.locale}</div>
+    </div>`;
+  document.getElementById('modalDesc').innerHTML = `<strong>策略说明：</strong>${d.desc}`;
+  document.getElementById('detailModal').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('detailModal').classList.remove('show');
+}
+
+function viewFullStrategy() {
+  alert(`跳转至策略详情页：策略ID = ${currentSid}\n（实际接入时跳转对应策略管理页面）`);
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+</script>
+</body>
+</html>
